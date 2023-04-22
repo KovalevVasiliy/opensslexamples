@@ -87,8 +87,43 @@ std::unique_ptr<EVP_PKEY, decltype(&::EVP_PKEY_free)> generateKeyPair(int32_t bi
     return std::move(key);
 }
 
+bool addCustomExtension(X509* cert, const char* key, const char* value) {
+    const int nid = OBJ_create(key, value, nullptr);
+
+    ASN1_OCTET_STRING* data = ASN1_OCTET_STRING_new();
+    int ret = ASN1_OCTET_STRING_set(data, reinterpret_cast<unsigned const char*>(value), strlen(value));
+    if (ret != 1) {
+        return false;
+    }
+
+    std::unique_ptr<X509_EXTENSION, decltype(&::X509_EXTENSION_free)> ex(X509_EXTENSION_create_by_NID(nullptr, nid, 0, data), ::X509_EXTENSION_free);
+    ret = X509_add_ext(cert, ex.get(), -1);
+    if (ret != 1) {
+        return false;
+    }
+    return true;
+}
+
+bool addStandardExtension(X509* cert, X509* issuer, int nid, const char* value) {
+    X509V3_CTX ctx; // create context
+    X509V3_set_ctx_nodb(&ctx); // init context
+    X509V3_set_ctx(&ctx, issuer, cert, nullptr, nullptr, 0); // set context
+
+    std::unique_ptr<X509_EXTENSION, decltype(&::X509_EXTENSION_free)> ex(X509V3_EXT_conf_nid(nullptr, &ctx, nid, value), ::X509_EXTENSION_free);
+    if (ex != nullptr) {
+        return X509_add_ext(cert, ex.get(), -1) == 1;
+    }
+    return false;
+}
+
 int main() {
     std::unique_ptr<X509, decltype(&::X509_free)> certificate(X509_new(), ::X509_free);
+    if (certificate == nullptr) {
+        std::cerr << "Failed to create certificate" << std::endl;
+        return -1;
+    }
+
+    std::unique_ptr<X509, decltype(&::X509_free)> duplicate(X509_dup(certificate.get()), ::X509_free);
     if (certificate == nullptr) {
         std::cerr << "Failed to create certificate" << std::endl;
         return -1;
@@ -109,7 +144,7 @@ int main() {
     }
 
     static constexpr const char* key = "CN";
-    static constexpr const char* value = "US";
+    static constexpr const char* value = "Common Name";
     res = updateSubjectName(certificate.get(), key, value);
     if (!res) {
         std::cerr << "Failed to updateSubjectName" << std::endl;
@@ -140,6 +175,20 @@ int main() {
         return -1;
     }
 
+    const int nid = NID_basic_constraints;
+    static const char* extensionValue = "critical,CA:TRUE";
+
+    res = addStandardExtension(certificate.get(), nullptr, nid, extensionValue);
+    if (!res) {
+        std::cerr << "Failed to addStandardExtension" << std::endl;
+        return -1;
+    }
+
+    res = addCustomExtension(certificate.get(), "1.2.3", "myvalue");
+    if (!res) {
+        std::cerr << "Failed to addCustomExtension" << std::endl;
+        return -1;
+    }
     res = signCert(certificate.get(), keyPair.get(), EVP_sha256());
     if (!res) {
         std::cerr << "Failed to signCert" << std::endl;
