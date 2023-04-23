@@ -87,16 +87,16 @@ std::unique_ptr<EVP_PKEY, decltype(&::EVP_PKEY_free)> generateKeyPair(int32_t bi
     return std::move(key);
 }
 
-bool addCustomExtension(X509* cert, const char* key, const char* value) {
+bool addCustomExtension(X509* cert, const char* key, const char* value, bool critical) {
     const int nid = OBJ_create(key, value, nullptr);
 
-    ASN1_OCTET_STRING* data = ASN1_OCTET_STRING_new();
-    int ret = ASN1_OCTET_STRING_set(data, reinterpret_cast<unsigned const char*>(value), strlen(value));
+    std::unique_ptr<ASN1_OCTET_STRING, decltype(&::ASN1_OCTET_STRING_free)> data(ASN1_OCTET_STRING_new(), ::ASN1_OCTET_STRING_free);
+    int ret = ASN1_OCTET_STRING_set(data.get(), reinterpret_cast<unsigned const char*>(value), strlen(value));
     if (ret != 1) {
         return false;
     }
 
-    std::unique_ptr<X509_EXTENSION, decltype(&::X509_EXTENSION_free)> ex(X509_EXTENSION_create_by_NID(nullptr, nid, 0, data), ::X509_EXTENSION_free);
+    std::unique_ptr<X509_EXTENSION, decltype(&::X509_EXTENSION_free)> ex(X509_EXTENSION_create_by_NID(nullptr, nid, critical, data.get()), ::X509_EXTENSION_free);
     return X509_add_ext(cert, ex.get(), -1) == 1;
 }
 
@@ -192,7 +192,7 @@ int main() {
         return -1;
     }
 
-    res = addCustomExtension(certificate.get(), "1.2.3", "myvalue");
+    res = addCustomExtension(certificate.get(), "1.2.3", "myvalue", false);
     if (!res) {
         std::cerr << "Failed to addCustomExtension" << std::endl;
         return -1;
