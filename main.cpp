@@ -91,7 +91,7 @@ bool addCustomExtension(X509* cert, const char* key, const char* value, bool cri
     const int nid = OBJ_create(key, value, nullptr);
 
     std::unique_ptr<ASN1_OCTET_STRING, decltype(&::ASN1_OCTET_STRING_free)> data(ASN1_OCTET_STRING_new(), ::ASN1_OCTET_STRING_free);
-    int ret = ASN1_OCTET_STRING_set(data.get(), reinterpret_cast<unsigned const char*>(value), strlen(value));
+    int ret = ASN1_OCTET_STRING_set(data.get(), reinterpret_cast<unsigned const char*>(value), static_cast<int>(strlen(value)));
     if (ret != 1) {
         return false;
     }
