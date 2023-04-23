@@ -1,2 +1,16 @@
-# opensslexamples
-Examples of OpenSSL usage with C++
+# Examples of OpenSSL usage with C++
+- Create X509 Certificate
+- Duplicate certificate
+- Update Subject name
+- Set Serial
+- Set Version
+- Set Issuer
+- Update Issuer info
+- Set Not Before
+- Set Not after
+- Add Standard Extension
+- Add custom Extension
+- Generate public/private keys
+- Set Public Key
+- Sign Certificate
+- Save Certificate to PEM file
