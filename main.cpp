@@ -97,11 +97,7 @@ bool addCustomExtension(X509* cert, const char* key, const char* value) {
     }
 
     std::unique_ptr<X509_EXTENSION, decltype(&::X509_EXTENSION_free)> ex(X509_EXTENSION_create_by_NID(nullptr, nid, 0, data), ::X509_EXTENSION_free);
-    ret = X509_add_ext(cert, ex.get(), -1);
-    if (ret != 1) {
-        return false;
-    }
-    return true;
+    return X509_add_ext(cert, ex.get(), -1) == 1;
 }
 
 bool addStandardExtension(X509* cert, X509* issuer, int nid, const char* value) {
@@ -116,14 +112,26 @@ bool addStandardExtension(X509* cert, X509* issuer, int nid, const char* value) 
     return false;
 }
 
+bool setIssuer(X509* cert, X509* issuer) {
+    bool result = false;
+    X509_NAME* subjectName = X509_get_subject_name(issuer);
+    if (subjectName != nullptr) {
+        result = X509_set_issuer_name(cert, subjectName) == 1;
+    }
+    return result;
+}
+
+bool addIssuerInfo(X509* cert, const char* key, const char* value) {
+    bool result = false;
+    X509_NAME* issuerName = X509_get_issuer_name(cert);
+    if (issuerName != nullptr) {
+        result = X509_NAME_add_entry_by_txt(issuerName, key, MBSTRING_ASC, (unsigned char*)value, -1, -1, 0) == 1;
+    }
+    return result;
+}
+
 int main() {
     std::unique_ptr<X509, decltype(&::X509_free)> certificate(X509_new(), ::X509_free);
-    if (certificate == nullptr) {
-        std::cerr << "Failed to create certificate" << std::endl;
-        return -1;
-    }
-
-    std::unique_ptr<X509, decltype(&::X509_free)> duplicate(X509_dup(certificate.get()), ::X509_free);
     if (certificate == nullptr) {
         std::cerr << "Failed to create certificate" << std::endl;
         return -1;
@@ -189,11 +197,37 @@ int main() {
         std::cerr << "Failed to addCustomExtension" << std::endl;
         return -1;
     }
+
     res = signCert(certificate.get(), keyPair.get(), EVP_sha256());
     if (!res) {
         std::cerr << "Failed to signCert" << std::endl;
         return -1;
     }
+
+    std::unique_ptr<X509, decltype(&::X509_free)> duplicate(X509_dup(certificate.get()), ::X509_free);
+    if (duplicate == nullptr) {
+        std::cerr << "Failed to duplicate certificate" << std::endl;
+        return -1;
+    }
+
+    res = setIssuer(certificate.get(), duplicate.get());
+    if (!res) {
+        std::cerr << "Failed to setIssuer" << std::endl;
+        return -1;
+    }
+
+    res = addIssuerInfo(certificate.get(), key, value);
+    if (!res) {
+        std::cerr << "Failed to addIssuerInfo" << std::endl;
+        return -1;
+    }
+
+    res = signCert(certificate.get(), keyPair.get(), EVP_sha256());
+    if (!res) {
+        std::cerr << "Failed to signCert" << std::endl;
+        return -1;
+    }
+
     static const std::string filename = "certificate.pem";
     res = saveCertToPemFile(certificate.get(), filename);
     if (!res) {
