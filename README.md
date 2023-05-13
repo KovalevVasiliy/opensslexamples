@@ -14,3 +14,4 @@
 - Set Public Key
 - Sign Certificate
 - Save Certificate to PEM file
+- Validate certificate
