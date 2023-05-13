@@ -158,12 +158,20 @@ std::pair<X509UPtr, EVP_KEYUPtr> generateRootCertificate() {
         return result;
     }
 
-    static constexpr const char* key = "CN";
-    static constexpr const char* value = "Common Name";
-    res = updateSubjectName(certificate.get(), key, value);
-    if (!res) {
-        std::cerr << "Failed to updateSubjectName" << std::endl;
-        return result;
+    std::unordered_map<const char* , const char*> subjectName {
+            {"CN", "Common Name"},
+            {"C", "US"},
+            {"O", "rootCompany"},
+            {"ST", "Texas"},
+            {"L", "Scottsdale"},
+    };
+
+    for (const auto& sn : subjectName) {
+        res = updateSubjectName(certificate.get(), sn.first, sn.second);
+        if (!res) {
+            std::cerr << "Failed to updateSubjectName" << std::endl;
+            return result;
+        }
     }
 
     uint32_t y = 2025;
@@ -197,7 +205,7 @@ std::pair<X509UPtr, EVP_KEYUPtr> generateRootCertificate() {
     std::unordered_map<int , const char*> extensions {
             {NID_basic_constraints, "critical,CA:TRUE"},
             {NID_subject_key_identifier, "hash"},
-            {NID_key_usage, "keyCertSign,cRLSign"},
+            {NID_key_usage, "critical,keyCertSign,cRLSign"},
     };
 
     for (const auto& ex : extensions) {
@@ -297,4 +305,16 @@ std::pair<X509UPtr, EVP_KEYUPtr> generateCertificate(X509* rootCert, EVP_PKEY* r
         return result;
     }
     return std::make_pair(std::move(certificate), std::move(keyPair));
+}
+
+bool addCert(X509_STORE* store, X509* cert) {
+    return X509_STORE_add_cert(store, cert) == 1;
+}
+
+bool addCAPath(X509_STORE* store, const char* path) {
+    return X509_STORE_load_path(store, path) == 1;
+}
+
+bool addCABundle(X509_STORE* store, const char* path) {
+    X509_STORE_load_file(store, path) == 1;
 }

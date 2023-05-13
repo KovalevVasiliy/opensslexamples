@@ -45,4 +45,8 @@ std::pair<X509UPtr, EVP_KEYUPtr> generateRootCertificate();
 
 std::pair<X509UPtr, EVP_KEYUPtr> generateCertificate(X509* rootCert, EVP_PKEY* keyPair);
 
+bool addCert(X509_STORE* store, X509* cert);
+bool addCAPath(X509_STORE* store, const char* path);
+bool addCABundle(X509_STORE* store, const char* path);
+
 #endif //UNTITLED2_CERTTOOLS_H
